@@ -20,6 +20,7 @@ Key Capabilities:
 import os
 import sys
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,7 @@ except ImportError:
 from config import (
     APP_NAME,
     APP_VERSION,
+    BASE_DIR,
     DEFAULT_MODEL,
     SAVED_CODE_DIR,
     SYSTEM_PROMPT,
@@ -149,6 +151,8 @@ class GeminiClient:
 def load_and_validate_api_key() -> str:
     """Loads and validates the Gemini API key from the environment."""
     load_dotenv()
+    load_dotenv(BASE_DIR / ".env")
+    load_dotenv(Path.home() / ".gemini_chatbot" / ".env")
     key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     placeholder = "your_gemini_api_key_here"
 
@@ -398,8 +402,13 @@ class ChatbotApp:
 
 
 # ---------------------------------------------------------------------------
-# Application Entry Point
+# Application Entry Point (CLI launcher)
 # ---------------------------------------------------------------------------
-if __name__ == "__main__":
+def main() -> None:
+    """Main CLI entrypoint for the 'chatbot' command."""
     app = ChatbotApp()
     app.run()
+
+
+if __name__ == "__main__":
+    main()

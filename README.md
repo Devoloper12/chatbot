@@ -5,13 +5,36 @@
 [![Platform: Cross--Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-green.svg)]()
 [![Powered By: Google Gemini](https://img.shields.io/badge/AI-Google%20Gemini%20API-orange.svg)](https://aistudio.google.com/)
 
-An advanced, interactive terminal AI chatbot and expert programming tutor powered by the **Google Gemini API**. Built with local **SQLite persistence**, multi-session memory, **Rich terminal styling**, syntax-highlighted code rendering, and academic CS lab capabilities.
+An advanced, cross-platform terminal AI assistant and academic programming tutor powered by the **Google Gemini API**. Built with local **SQLite persistence**, multi-session memory, **Rich terminal styling**, syntax-highlighted code rendering, and academic CS lab capabilities.
 
-Compatible with **Windows (CMD/PowerShell)**, **Ubuntu / Debian**, **Linux**, and **macOS**.
+Installable as a global terminal command (`chatbot`) on **Windows Command Prompt**, **PowerShell**, **Ubuntu / Debian**, **Linux**, and **macOS**.
 
 ---
 
-## 📸 Terminal Preview & Screenshots
+## ⚡ Quick Start (The 4-Step Workflow)
+
+Clone the repository and run the chatbot directly from any terminal:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Devoloper12/chatbot.git
+cd chatbot
+
+# 2. Install dependencies & register the 'chatbot' CLI command
+pip install -r requirements.txt
+pip install -e .
+
+# 3. Configure your API key
+cp .env.example .env     # On Windows CMD: copy .env.example .env
+nano .env               # On Windows: notepad .env
+
+# 4. Launch from any terminal!
+chatbot
+```
+
+---
+
+## 📸 Terminal Preview
 
 ```text
 ╭──────────────────────────────── ● ONLINE ────────────────────────────────╮
@@ -74,49 +97,35 @@ You (#1): /savecode quicksort.c
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-### 1. 🧠 Persistent Multi-Session Chat Memory
-- Saves all conversations locally using **SQLite** (`chatbot.db`).
-- Resumes the most recent conversation automatically on startup.
-- Supports switching, creating, listing, searching, and deleting separate sessions.
-
-### 2. 🎨 Rich Terminal UI
-- Rendered using Python's **`rich`** library.
-- Animated typing spinner (`⠋ Thinking & compiling response...`).
-- Full terminal **Markdown rendering** (tables, lists, syntax-highlighted code).
-- Accurate generation latency display (`⚡ Generated in 1.25s`).
-
-### 3. 🎓 Smart AI Programming Tutor
-Configured via an academic system instruction specializing in:
-- **C Programming** & System Calls (Pointers, Memory Allocation, Structures, Fork, Threads).
-- **Python Programming** (OOP, Generators, Async, Data Analysis, Scripting).
-- **Data Structures & Algorithms (DSA)** (Linked Lists, Stacks, Queues, Trees, Graphs, DP).
-- **Exam Algorithms** (Step-by-step algorithms with time/space complexity analysis).
-- **Code Debugging** & Line-by-Line explanations.
-- **Linux & Ubuntu Terminal Commands** (`grep`, `find`, `awk`, `chmod`, shell scripting).
-- **Core CS Subjects** (OS, DBMS, SQL, Computer Networks).
-
-### 4. 💾 Code Extraction & Auto-Saving
-- Automatically extract code blocks from AI replies with `/savecode [filename]`.
-- Saves code with appropriate extensions (`.c`, `.py`, `.sh`, `.sql`) into `saved_code/`.
-- Optional `AUTO_SAVE_CODE=true` flag in `.env` to save code automatically.
-
-### 5. 🔍 Full-Text Conversation Search
-- Search through all previous chats and lab sessions with `/search <keyword>`.
-- Displays snippet matches with timestamps and session IDs in a formatted table.
+- **CLI Launcher (`chatbot`)**: Packaged with `setup.py` and `pyproject.toml` so you can launch the bot by simply typing `chatbot`.
+- **Cross-Platform**: Tested on Windows Command Prompt, PowerShell, Ubuntu, Debian, Fedora, Arch Linux, and macOS.
+- **Persistent Multi-Session Memory**: SQLite database (`chatbot.db`) automatically saves conversations and resumes your last session on startup.
+- **Rich Terminal UI**: Animated typing spinner (`⠋ Thinking & compiling response...`), Markdown syntax highlighting, tables, and latency indicators.
+- **Academic CS Tutor Persona**: Expert tutoring in C, Python, Data Structures, Algorithms, Linux/Ubuntu commands, Operating Systems, DBMS, and exam preparations.
+- **Code Extraction & Saving**: Extract and save code blocks directly to files in `saved_code/` using `/savecode [filename]`.
+- **Search & Export**: Search prior chats with `/search <query>` and export sessions to Markdown/TXT with `/export`.
 
 ---
 
 ## 📁 Project Structure
 
 ```text
-gemini-terminal-chatbot/
+chatbot/
 ├── chatbot.py          # Main entrypoint and interactive command loop
 ├── config.py           # Configuration, models, and smart AI system prompts
 ├── database.py         # SQLite persistence: sessions, messages, search, export
 ├── ui.py               # Rich UI components: banners, tables, markdown rendering
+├── setup.py            # Packaging script for 'chatbot' console command
+├── pyproject.toml      # Modern PEP 517 build configuration
 ├── requirements.txt    # Project dependencies
+├── setup.sh            # Automated setup script for Linux & macOS
+├── setup.bat           # Automated setup script for Windows CMD
+├── setup.ps1           # Automated setup script for Windows PowerShell
+├── chatbot.bat         # Direct Windows command runner
+├── chatbot             # Direct Linux/macOS executable runner
+├── run.sh              # Linux launcher script
 ├── .env.example        # Environment variable template
 ├── .gitignore          # Git ignore rules (protects API keys, database, code)
 ├── CONTRIBUTING.md     # Contribution guidelines
@@ -128,163 +137,133 @@ gemini-terminal-chatbot/
 
 ## 🔑 Getting a Free Google Gemini API Key
 
-1. Go to **[Google AI Studio](https://aistudio.google.com/)**.
+1. Visit **[Google AI Studio](https://aistudio.google.com/)**.
 2. Sign in with your Google account.
-3. Click **"Get API key"** in the left navigation menu.
-4. Click **"Create API key"**.
-5. Copy your generated key string.
+3. Click **"Get API key"** in the sidebar.
+4. Click **"Create API key"** and copy your generated key string.
 
 ---
 
-## 🚀 Installation & Setup
+## 🚀 Installation by Operating System
 
-### 1. Clone the Repository
+### 1. Windows (Command Prompt & PowerShell)
 
-```bash
-git clone https://github.com/your-username/gemini-terminal-chatbot.git
-cd gemini-terminal-chatbot
-```
+#### Automated Setup (Fastest):
+Double-click `setup.bat` (or run `.\setup.ps1` in PowerShell). It will create the virtual environment, install dependencies, and register the `chatbot` command.
 
----
-
-### 2. Set Up a Virtual Environment
-
-#### On Windows (PowerShell / Command Prompt)
-
+#### Manual Setup:
 ```powershell
-# Create virtual environment
-python -m venv venv
+# 1. Clone the repository
+git clone https://github.com/Devoloper12/chatbot.git
+cd chatbot
 
-# Activate on PowerShell:
-.\venv\Scripts\Activate.ps1
+# 2. Create and activate a virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1    # On Command Prompt: .venv\Scripts\activate.bat
 
-# Or activate on Command Prompt (cmd.exe):
-.\venv\Scripts\activate.bat
+# 3. Install dependencies and CLI package
+pip install -r requirements.txt
+pip install -e .
+
+# 4. Configure your API key
+copy .env.example .env
+notepad .env
+
+# 5. Launch the chatbot!
+chatbot
 ```
 
-> **Note for Windows PowerShell:** If script execution is blocked, enable it by running:
+> **PowerShell Note:** If execution of scripts is blocked on Windows, run once:
 > ```powershell
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
 
-#### On Ubuntu / Debian Linux
+---
 
+### 2. Ubuntu / Debian Linux
+
+#### Automated Setup (Fastest):
 ```bash
-# Install Python 3 venv tools if not present
+chmod +x setup.sh
+./setup.sh
+```
+
+#### Manual Setup:
+```bash
+# 1. Install Python 3 and venv tools if not present
 sudo apt update
-sudo apt install -y python3 python3-venv python3-pip
+sudo apt install -y python3 python3-venv python3-pip git
 
-# Create virtual environment
-python3 -m venv venv
+# 2. Clone the repository
+git clone https://github.com/Devoloper12/chatbot.git
+cd chatbot
 
-# Activate virtual environment
-source venv/bin/activate
-```
+# 3. Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 
-#### On macOS
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
----
-
-### 3. Install Dependencies
-
-With your virtual environment activated:
-
-```bash
+# 4. Install dependencies and register 'chatbot' command
 pip install -r requirements.txt
-```
+pip install -e .
 
----
-
-### 4. Configure Environment Variables
-
-Create your `.env` configuration file from the template:
-
-#### Linux / macOS:
-```bash
+# 5. Configure API key
 cp .env.example .env
-```
+nano .env
 
-#### Windows (PowerShell):
-```powershell
-Copy-Item .env.example .env
-```
-
-#### Windows (Command Prompt):
-```cmd
-copy .env.example .env
-```
-
-Open `.env` in any text editor and paste your API key:
-
-```env
-# Required: Your Google Gemini API Key
-GEMINI_API_KEY=AIzaSyYourActualKeyHere
-
-# Optional: Preferred Gemini Model (default: gemini-2.5-flash)
-GEMINI_MODEL=gemini-2.5-flash
-
-# Optional: Automatically save extracted code blocks to saved_code/ (true/false)
-AUTO_SAVE_CODE=false
+# 6. Launch!
+chatbot
 ```
 
 ---
 
-## 💬 Running the Chatbot
-
-Make sure your virtual environment is activated, then launch:
+### 3. macOS
 
 ```bash
-python chatbot.py
+# 1. Clone repository
+git clone https://github.com/Devoloper12/chatbot.git
+cd chatbot
+
+# 2. Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3. Install dependencies and CLI command
+pip install -r requirements.txt
+pip install -e .
+
+# 4. Configure API key
+cp .env.example .env
+nano .env
+
+# 5. Launch!
+chatbot
 ```
-*(Or `python3 chatbot.py` on Linux/macOS)*
 
 ---
 
-## 🛠️ Complete Command Reference
+## 🛠️ In-Chat Commands Reference
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `/help` | Show full command table and academic tips | `/help` |
-| `/new [title]` | Create and switch to a new conversation session | `/new DSA Lab Exam Prep` |
-| `/list` | List all saved conversation sessions with message counts | `/list` |
+| `/help` | Display command reference and CS tutor tips | `/help` |
+| `/new [title]` | Create a fresh conversation session | `/new DSA Exam Prep` |
+| `/list` | List all saved sessions with message counts | `/list` |
 | `/switch <id>` | Switch to an existing conversation session | `/switch 2` |
-| `/history [limit]` | View conversation history for the active session | `/history 10` |
-| `/clear` | Clear message history for the active session | `/clear` |
-| `/delete <id>` | Delete a session and its message history | `/delete 3` |
-| `/savecode [name]` | Extract and save code from the last bot response to `saved_code/` | `/savecode dijkstra.c` |
-| `/search <query>` | Full-text search across all previous chats | `/search binary tree` |
-| `/export [md\|txt]` | Export current conversation to Markdown or TXT in `exports/` | `/export md` |
+| `/history [limit]` | View conversation messages for active session | `/history 10` |
+| `/clear` | Clear message memory for active session | `/clear` |
+| `/delete <id>` | Delete a session and its saved messages | `/delete 3` |
+| `/savecode [name]` | Save code from last bot response to `saved_code/` | `/savecode dijkstra.c` |
+| `/search <query>` | Full-text search across all saved sessions | `/search binary search` |
+| `/export [md\|txt]` | Export conversation to Markdown or TXT | `/export md` |
 | `/save` | Quick-save conversation to `exports/` | `/save` |
-| `/about` | View bot version, active model, and database statistics | `/about` |
+| `/about` | View bot version, active model, and stats | `/about` |
 | `/exit`, `/quit` | Gracefully quit the chatbot | `/exit` |
-
----
-
-## 🎯 Example Academic & Programming Prompts
-
-Try asking these questions in the terminal:
-
-- **College Lab Programs:**
-  > *"Write a menu-driven C program to implement a Circular Queue with enqueue, dequeue, and display functions."*
-- **Exam Algorithms:**
-  > *"Give an exam-oriented algorithm for Kruskal's Minimum Spanning Tree with time complexity analysis and sample I/O."*
-- **Line-by-Line Code Explanation:**
-  > *"Explain how this Python quicksort implementation works line by line."*
-- **Code Debugging:**
-  > *"Debug this C program that produces a Segmentation Fault when inserting into a linked list: [paste code]"*
-- **Linux & Shell Commands:**
-  > *"Explain how to use find and xargs to delete all .tmp files recursively on Ubuntu."*
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on submitting issues, feature requests, and pull requests.
+Contributions are warmly welcomed! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on submitting issues, features, and pull requests.
 
 ---
 

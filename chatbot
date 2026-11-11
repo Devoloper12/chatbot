@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Direct CLI Launcher for Linux and macOS
+# Usage: ./chatbot or chatbot (when in PATH)
+# =============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/.venv/bin/python3" ]; then
+    "$SCRIPT_DIR/.venv/bin/python3" "$SCRIPT_DIR/chatbot.py" "$@"
+elif [ -f "$SCRIPT_DIR/venv/bin/python3" ]; then
+    "$SCRIPT_DIR/venv/bin/python3" "$SCRIPT_DIR/chatbot.py" "$@"
+else
+    python3 "$SCRIPT_DIR/chatbot.py" "$@"
+fi

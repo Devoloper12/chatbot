@@ -11,3 +11,6 @@ rich>=13.0.0
 
 # Cross-platform colored terminal text (Windows, Linux, macOS)
 colorama>=0.4.6
+
+# Packaging and console script entrypoints
+setuptools>=61.0
