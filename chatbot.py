@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 =============================================================================
-Gemini Terminal AI Chatbot
+Terminal AI Chatbot (Powered by Groq & Gemini)
 =============================================================================
 A modern, persistent, and academic-oriented terminal AI assistant powered
-by the Google Gemini API.
+primarily by Groq (LLaMA-3.3-70B / 8B) with fallback Gemini support.
 
 Key Capabilities:
+  - Ultra-fast responses powered by Groq LPU inference
   - Persistent SQLite chat memory across sessions
   - Rich-formatted terminal interface with spinners and Markdown rendering
   - Smart system prompt acting as an expert CS & programming tutor
@@ -40,28 +41,30 @@ except ImportError:
     print("Please install dependencies: pip install -r requirements.txt\n")
     sys.exit(1)
 
-# Check Gemini SDK (Modern google-genai vs legacy google-generativeai)
-SDK_MODE = None
+# Check Groq SDK
+GROQ_AVAILABLE = False
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:
+    pass
+
+# Check Gemini SDK
+GEMINI_AVAILABLE = False
 try:
     from google import genai
     from google.genai import types as genai_types
-    from google.genai import errors as genai_errors
-    SDK_MODE = "google-genai"
+    GEMINI_AVAILABLE = True
 except ImportError:
-    try:
-        import google.generativeai as legacy_genai
-        from google.api_core import exceptions as legacy_errors
-        SDK_MODE = "google-generativeai"
-    except ImportError:
-        print("\n[Error] Neither 'google-genai' nor 'google-generativeai' is installed.")
-        print("Please install required packages: pip install -r requirements.txt\n")
-        sys.exit(1)
+    pass
 
 # Import local modules
 from config import (
     APP_NAME,
     APP_VERSION,
     BASE_DIR,
+    DEFAULT_GEMINI_MODEL,
+    DEFAULT_GROQ_MODEL,
     DEFAULT_MODEL,
     SAVED_CODE_DIR,
     SYSTEM_PROMPT,
@@ -86,34 +89,37 @@ from ui import (
 
 
 # ---------------------------------------------------------------------------
-# Gemini AI Client & Session Wrapper
+# Unified AI Client (Groq & Gemini)
 # ---------------------------------------------------------------------------
-class GeminiClient:
-    """Manages connection, system prompts, context history, and communication."""
+class UnifiedAIClient:
+    """Manages AI connections, multi-turn history, and responses across Groq and Gemini."""
 
-    def __init__(self, api_key: str, model_name: str):
+    def __init__(self, provider: str, api_key: str, model_name: str):
+        self.provider = provider.lower()
         self.api_key = api_key
         self.model_name = model_name
-        self.client = None
-        self.chat = None
         self.history_cache: List[Dict[str, Any]] = []
+        self.groq_client = None
+        self.gemini_client = None
+        self.gemini_chat = None
+        self._init_client()
 
-    def _ensure_client(self) -> None:
-        """Ensures the API client instance is alive and active."""
-        if SDK_MODE == "google-genai":
-            self.client = genai.Client(api_key=self.api_key)
+    def _init_client(self) -> None:
+        """Initializes the active provider client."""
+        if self.provider == "groq":
+            if not GROQ_AVAILABLE:
+                raise ImportError("The 'groq' package is required. Install it using: pip install groq")
+            self.groq_client = Groq(api_key=self.api_key)
         else:
-            legacy_genai.configure(api_key=self.api_key)
+            if not GEMINI_AVAILABLE:
+                raise ImportError("The 'google-genai' package is required. Install it using: pip install google-genai")
+            self.gemini_client = genai.Client(api_key=self.api_key)
 
     def initialize_chat(self, history_messages: Optional[List[Dict[str, Any]]] = None) -> None:
-        """
-        Initializes or restores a chat session with the expert CS tutor
-        system prompt and historical conversation turns.
-        """
+        """Initializes or restores conversation history."""
         self.history_cache = history_messages or []
-        self._ensure_client()
 
-        if SDK_MODE == "google-genai":
+        if self.provider == "gemini":
             contents = []
             for msg in self.history_cache:
                 role = "user" if msg["role"] == "user" else "model"
@@ -123,111 +129,136 @@ class GeminiClient:
                         parts=[genai_types.Part.from_text(text=msg["content"])],
                     )
                 )
-
             config = genai_types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 temperature=0.7,
             )
-            self.chat = self.client.chats.create(
+            self.gemini_chat = self.gemini_client.chats.create(
                 model=self.model_name,
                 config=config,
                 history=contents if contents else None,
             )
-        else:
-            model = legacy_genai.GenerativeModel(
-                model_name=self.model_name,
-                system_instruction=SYSTEM_PROMPT,
-            )
-            legacy_history = []
-            for msg in self.history_cache:
-                role = "user" if msg["role"] == "user" else "model"
-                legacy_history.append({"role": role, "parts": [msg["content"]]})
-            self.chat = model.start_chat(history=legacy_history)
 
     def send_message(self, user_message: str) -> str:
-        """Sends a message to the active chat session and returns the AI reply."""
-        if not self.chat or (SDK_MODE == "google-genai" and self.client is None):
-            self.initialize_chat(self.history_cache)
+        """Routes message to the active provider."""
+        if self.provider == "groq":
+            return self._send_groq(user_message)
+        else:
+            return self._send_gemini(user_message)
+
+    def _send_groq(self, user_message: str) -> str:
+        """Sends chat request to Groq API (LLaMA-3.3-70B / 8B)."""
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # Load multi-turn history
+        for m in self.history_cache:
+            role = "assistant" if m["role"] == "bot" else "user"
+            messages.append({"role": role, "content": m["content"]})
+        # Add current user prompt
+        messages.append({"role": "user", "content": user_message})
 
         try:
-            response = self.chat.send_message(user_message)
+            completion = self.groq_client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                temperature=0.6,
+                max_tokens=4096,
+            )
+            reply = completion.choices[0].message.content
+            return reply if reply else "(No response generated by model)"
+        except Exception as error:
+            error_str = str(error)
+            # Automatic fallback to LLaMA-3.1-8B-instant if rate limit occurs
+            if "rate_limit" in error_str.lower() and self.model_name != "llama-3.1-8b-instant":
+                console.print("[dim yellow][System] Switching to llama-3.1-8b-instant due to traffic...[/dim yellow]")
+                self.model_name = "llama-3.1-8b-instant"
+                completion = self.groq_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=0.6,
+                    max_tokens=4096,
+                )
+                reply = completion.choices[0].message.content
+                return reply if reply else "(No response generated by model)"
+            raise error
+
+    def _send_gemini(self, user_message: str) -> str:
+        """Sends chat request to Gemini API."""
+        if not self.gemini_chat:
+            self.initialize_chat(self.history_cache)
+        try:
+            response = self.gemini_chat.send_message(user_message)
             return response.text if response.text else "(No response generated by model)"
         except Exception as error:
             error_str = str(error)
-            # If the model was retired / not found (404), auto-fallback to active working model
-            if "404" in error_str or "not found" in error_str.lower() or "no longer available" in error_str.lower():
-                for fallback in ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
-                    if self.model_name != fallback:
-                        console.print(f"[dim yellow][System] Model '{self.model_name}' unavailable. Auto-switching to '{fallback}'...[/dim yellow]")
-                        self.model_name = fallback
-                        self.initialize_chat(self.history_cache)
-                        response = self.chat.send_message(user_message)
-                        return response.text if response.text else "(No response generated by model)"
-            # Auto-recover if the client connection was closed
             if "client has been closed" in error_str.lower():
                 self.initialize_chat(self.history_cache)
-                response = self.chat.send_message(user_message)
+                response = self.gemini_chat.send_message(user_message)
                 return response.text if response.text else "(No response generated by model)"
             raise error
 
 
 # ---------------------------------------------------------------------------
-# API Key Verification
+# API Key Verification & Provider Auto-Detection
 # ---------------------------------------------------------------------------
-def load_and_validate_api_key() -> str:
-    """Loads and validates the Gemini API key from the environment or user input."""
+def load_and_validate_api_key() -> Tuple[str, str, str]:
+    """
+    Loads API key and determines provider (Groq or Gemini).
+    Returns: (provider, api_key, model_name)
+    """
     load_dotenv()
     load_dotenv(BASE_DIR / ".env")
+    load_dotenv(Path.home() / ".terminal_ai_chatbot" / ".env")
     load_dotenv(Path.home() / ".gemini_chatbot" / ".env")
-    key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    placeholder = "your_gemini_api_key_here"
 
-    if not key or key.strip() == "" or key.strip() == placeholder or key.startswith("AQ."):
-        if key and key.startswith("AQ."):
-            console.print("\n[bold red][!] Invalid Key Format Detected[/bold red]")
-            console.print("[yellow]Your current key starts with 'AQ.', which is an OAuth access token, not a Gemini API Key.[/yellow]")
-            console.print("Gemini API keys from Google AI Studio always begin with [bold green]AIzaSy...[/bold green] (39 characters).\n")
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-        console.print("\n[bold yellow]🔑 Google Gemini API Key Required[/bold yellow]")
-        console.print("[dim]Get your free API key at: [bold cyan]https://aistudio.google.com/apikey[/bold cyan][/dim]\n")
-        try:
-            prompt_key = console.input("[bold cyan]Enter your GEMINI_API_KEY (starts with AIzaSy...): [/bold cyan]").strip()
-            if prompt_key and prompt_key != placeholder:
-                key = prompt_key
-                # Save key to local and home configuration
-                for env_dir in [BASE_DIR, Path.home() / ".gemini_chatbot"]:
-                    try:
-                        env_dir.mkdir(parents=True, exist_ok=True)
-                        env_file = env_dir / ".env"
-                        lines = []
-                        if env_file.exists():
-                            with open(env_file, "r", encoding="utf-8") as f:
-                                lines = [line for line in f if not line.startswith("GEMINI_API_KEY=")]
-                        lines.append(f"GEMINI_API_KEY={key}\n")
-                        with open(env_file, "w", encoding="utf-8") as f:
-                            f.writelines(lines)
-                    except Exception:
-                        pass
-                console.print(f"[bold green][✔] API key updated successfully![/bold green]\n")
-                return key
-        except (KeyboardInterrupt, EOFError):
-            pass
+    # 1. Check for Groq API Key
+    if groq_key and groq_key.strip() and groq_key.strip() != "your_groq_api_key_here":
+        model = os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL
+        return "groq", groq_key.strip(), model
 
-        print_error(
-            "Invalid GEMINI_API_KEY",
-            "A valid Gemini API Key starting with 'AIzaSy' is required.\n\n"
-            "Steps to get one:\n"
-            "1. Visit https://aistudio.google.com/apikey\n"
-            "2. Click 'Create API key'\n"
-            "3. Copy the key (starts with AIzaSy...)\n"
-            "4. Add to .env: GEMINI_API_KEY=AIzaSy...\n"
-        )
-        sys.exit(1)
-            "2. Set: export GEMINI_API_KEY=AIzaSy...your_actual_key (or in PowerShell: $env:GEMINI_API_KEY='...')\n"
-        )
-        sys.exit(1)
+    # 2. Check for Gemini API Key (valid format)
+    if gemini_key and gemini_key.strip().startswith("AIzaSy"):
+        model = os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip() or DEFAULT_GEMINI_MODEL
+        return "gemini", gemini_key.strip(), model
 
-    return key.strip()
+    # 3. Interactive Setup for Groq Key (100% Free & Fast)
+    console.print("\n[bold cyan]🚀 Groq AI Configuration (Ultra-Fast & 100% Free)[/bold cyan]")
+    console.print("[dim]Get your free Groq API key in 5 seconds at: [bold green]https://console.groq.com/keys[/bold green][/dim]\n")
+
+    try:
+        prompt_key = console.input("[bold yellow]Enter your GROQ_API_KEY (starts with gsk_...): [/bold yellow]").strip()
+        if prompt_key and (prompt_key.startswith("gsk_") or len(prompt_key) > 20):
+            # Save key to local and home configuration
+            for env_dir in [BASE_DIR, Path.home() / ".terminal_ai_chatbot", Path.home() / ".gemini_chatbot"]:
+                try:
+                    env_dir.mkdir(parents=True, exist_ok=True)
+                    env_file = env_dir / ".env"
+                    lines = []
+                    if env_file.exists():
+                        with open(env_file, "r", encoding="utf-8") as f:
+                            lines = [line for line in f if not line.startswith("GROQ_API_KEY=")]
+                    lines.append(f"GROQ_API_KEY={prompt_key}\n")
+                    lines.append(f"GROQ_MODEL={DEFAULT_GROQ_MODEL}\n")
+                    with open(env_file, "w", encoding="utf-8") as f:
+                        f.writelines(lines)
+                except Exception:
+                    pass
+            console.print("[bold green][✔] Groq API key configured successfully![/bold green]\n")
+            return "groq", prompt_key, DEFAULT_GROQ_MODEL
+    except (KeyboardInterrupt, EOFError):
+        pass
+
+    print_error(
+        "API Key Required",
+        "A free Groq API key is required to run the chatbot.\n\n"
+        "👉 Steps to get a free key in 10 seconds:\n"
+        "1. Open https://console.groq.com/keys\n"
+        "2. Click 'Create API Key'\n"
+        "3. Paste it when prompted or save in .env: GROQ_API_KEY=gsk_...\n"
+    )
+    sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -237,12 +268,15 @@ class ChatbotApp:
     """Main application controller managing state, commands, and chat flow."""
 
     def __init__(self):
-        self.api_key = load_and_validate_api_key()
-        self.model_name = os.getenv("GEMINI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+        self.provider, self.api_key, self.model_name = load_and_validate_api_key()
         self.auto_save_code = os.getenv("AUTO_SAVE_CODE", "false").lower() in ("true", "1", "yes")
 
         self.db = ChatDatabase()
-        self.ai_client = GeminiClient(api_key=self.api_key, model_name=self.model_name)
+        self.ai_client = UnifiedAIClient(
+            provider=self.provider,
+            api_key=self.api_key,
+            model_name=self.model_name,
+        )
 
         # Active Session State
         self.current_session_id, self.current_session_title = self.db.get_or_create_active_session()
@@ -252,12 +286,12 @@ class ChatbotApp:
         self._load_active_session_into_ai()
 
     def _load_active_session_into_ai(self) -> None:
-        """Loads previous messages from database into Gemini chat context."""
+        """Loads previous messages from database into AI chat context."""
         history = self.db.get_session_messages(self.current_session_id)
         try:
             self.ai_client.initialize_chat(history)
         except Exception as e:
-            print_error("Failed to Initialize Gemini Session", str(e))
+            print_error("Failed to Initialize Session", str(e))
 
     def handle_command(self, cmd_line: str) -> bool:
         """
@@ -281,7 +315,7 @@ class ChatbotApp:
             self.db.clear_session_messages(self.current_session_id)
             self._load_active_session_into_ai()
             clear_screen()
-            print_startup_banner(self.model_name, self.current_session_id, self.current_session_title)
+            print_startup_banner(f"{self.provider.upper()}: {self.model_name}", self.current_session_id, self.current_session_title)
             print_system_info(f"Chat history cleared for session #{self.current_session_id}. Fresh context ready.")
             return True
 
@@ -296,7 +330,7 @@ class ChatbotApp:
             self.current_session_id, self.current_session_title = self.db.create_session(new_title)
             self._load_active_session_into_ai()
             clear_screen()
-            print_startup_banner(self.model_name, self.current_session_id, self.current_session_title)
+            print_startup_banner(f"{self.provider.upper()}: {self.model_name}", self.current_session_id, self.current_session_title)
             print_system_info(f"Created new session #{self.current_session_id}: '{self.current_session_title}'.")
             return True
 
@@ -318,7 +352,7 @@ class ChatbotApp:
             self.current_session_title = self.db.get_session_title(target_id) or f"Session #{target_id}"
             self._load_active_session_into_ai()
             clear_screen()
-            print_startup_banner(self.model_name, self.current_session_id, self.current_session_title)
+            print_startup_banner(f"{self.provider.upper()}: {self.model_name}", self.current_session_id, self.current_session_title)
             print_system_info(f"Switched to session #{self.current_session_id}: '{self.current_session_title}'.")
             return True
 
@@ -331,7 +365,6 @@ class ChatbotApp:
             deleted = self.db.delete_session(target_id)
             if deleted:
                 print_system_info(f"Session #{target_id} has been deleted.")
-                # If deleted current session, switch to or create another
                 if target_id == self.current_session_id:
                     self.current_session_id, self.current_session_title = self.db.get_or_create_active_session()
                     self._load_active_session_into_ai()
@@ -373,13 +406,13 @@ class ChatbotApp:
 
         elif command in ("/about", "about"):
             stats = self.db.get_database_stats()
-            print_about_panel(stats, self.model_name)
+            print_about_panel(stats, f"{self.provider.upper()} ({self.model_name})")
             return True
 
         return False
 
     def process_chat_message(self, user_input: str) -> None:
-        """Sends user message to Gemini API, measures latency, and handles errors."""
+        """Sends user message to AI provider, measures latency, and renders response."""
         start_time = time.perf_counter()
         bot_reply = ""
         duration = 0.0
@@ -387,7 +420,7 @@ class ChatbotApp:
         try:
             # Rich animated spinner typing indicator
             with console.status(
-                f"[bold cyan]Thinking & compiling response ({self.model_name})...[/bold cyan]",
+                f"[bold cyan]Thinking & compiling response ({self.provider.upper()} {self.model_name})...[/bold cyan]",
                 spinner="dots",
             ):
                 bot_reply = self.ai_client.send_message(user_input)
@@ -413,47 +446,28 @@ class ChatbotApp:
             error_str = str(error)
             error_lower = error_str.lower()
 
-            if "free tier is not available" in error_lower or ("403" in error_str and "billing" in error_lower):
-                print_error(
-                    "Free Tier Not Available For This Project (HTTP 403)",
-                    "Your API key was created in a Google Cloud project that requires paid billing.\n\n"
-                    "👉 How to fix for 100% FREE access:\n"
-                    "1. Go to: https://aistudio.google.com/apikey\n"
-                    "2. Click 'Create API key'\n"
-                    "3. Select 'Create API key in NEW project' (do NOT select an existing paid/workspace project)\n"
-                    "4. Copy the new key and update your .env file:\n"
-                    "   GEMINI_API_KEY=AIzaSy...your_new_key\n",
-                )
-            elif "429" in error_str or "quota" in error_lower or "resource_exhausted" in error_lower:
+            if "rate_limit" in error_lower or "429" in error_str:
                 print_error(
                     "Rate Limit Exceeded (HTTP 429)",
-                    "You have hit the Gemini API rate limit or free tier quota.\n"
-                    "Please wait a few seconds before asking another question.",
+                    "You have hit the provider rate limit. Please wait a few seconds before asking another question.",
                 )
-            elif "400" in error_str or "403" in error_str or "api_key" in error_lower or "permission_denied" in error_lower:
+            elif "authentication" in error_lower or "401" in error_str or "api_key" in error_lower:
                 print_error(
-                    "Authentication / Permission Failure (HTTP 403)",
-                    f"The Gemini API rejected your key.\n\n"
-                    f"Detail: {error_str}\n\n"
-                    "Please check or re-generate your key at: https://aistudio.google.com/apikey",
+                    "Authentication Failure",
+                    f"Invalid {self.provider.upper()} API key. Check your key in .env.",
                 )
             elif any(net in error_lower for net in ["connection", "timeout", "timed out", "dns", "getaddrinfo"]):
                 print_error(
                     "Network Connection Failure",
-                    "Unable to reach Google Gemini servers. Check your internet connection.",
-                )
-            elif "client has been closed" in error_lower:
-                print_error(
-                    "Connection Interrupted",
-                    "The client connection was reset. Please try sending your message again.",
+                    "Unable to reach AI servers. Check your internet connection.",
                 )
             else:
-                print_error("Gemini API Error", error_str)
+                print_error(f"{self.provider.upper()} API Error", error_str)
 
     def run(self) -> None:
         """Main application execution loop."""
         clear_screen()
-        print_startup_banner(self.model_name, self.current_session_id, self.current_session_title)
+        print_startup_banner(f"{self.provider.upper()}: {self.model_name}", self.current_session_id, self.current_session_title)
 
         while True:
             try:

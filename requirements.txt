@@ -1,6 +1,9 @@
-# Dependencies for Gemini Terminal Chatbot
+# Dependencies for Terminal AI Chatbot
 
-# Official Google Gen AI SDK (Gemini API client)
+# Groq High-Speed AI SDK (Primary Provider)
+groq>=0.11.0
+
+# Google Gen AI SDK (Alternative Provider)
 google-genai>=1.0.0
 
 # Load environment variables from .env file

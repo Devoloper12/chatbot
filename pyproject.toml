@@ -9,6 +9,7 @@ description = "Cross-platform terminal AI chatbot and CS tutor powered by Google
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
+    "groq>=0.11.0",
     "google-genai>=1.0.0",
     "python-dotenv>=1.0.0",
     "rich>=13.0.0",

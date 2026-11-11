@@ -13,6 +13,7 @@ setup(
     author="Devoloper12",
     py_modules=["chatbot", "config", "database", "ui"],
     install_requires=[
+        "groq>=0.11.0",
         "google-genai>=1.0.0",
         "python-dotenv>=1.0.0",
         "rich>=13.0.0",

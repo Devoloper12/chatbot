@@ -11,21 +11,21 @@ import os
 from pathlib import Path
 
 # Application Metadata
-APP_NAME = "Gemini Terminal AI Assistant"
-APP_VERSION = "2.0.0"
-APP_SUBTITLE = "Expert Programming Tutor & Computer Science Assistant"
+APP_NAME = "Terminal AI Assistant"
+APP_VERSION = "2.1.0"
+APP_SUBTITLE = "Expert CS & Programming Tutor (Powered by Groq LLaMA-3.3 & Gemini)"
 
 # Storage directory resolution (supports running from local clone or global pip install)
 CWD = Path.cwd()
 if (CWD / "chatbot.py").exists() or (CWD / ".env").exists():
     STORAGE_DIR = CWD
 else:
-    STORAGE_DIR = Path.home() / ".gemini_chatbot"
+    STORAGE_DIR = Path.home() / ".terminal_ai_chatbot"
 
 try:
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 except (PermissionError, OSError):
-    STORAGE_DIR = Path.home() / ".gemini_chatbot"
+    STORAGE_DIR = Path.home() / ".terminal_ai_chatbot"
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 BASE_DIR = STORAGE_DIR
@@ -37,9 +37,10 @@ EXPORTS_DIR = STORAGE_DIR / "exports"
 SAVED_CODE_DIR.mkdir(parents=True, exist_ok=True)
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Default Model Configuration
-DEFAULT_MODEL = "gemini-3.5-flash-lite"
-FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+# Default Model Configurations
+DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_MODEL = DEFAULT_GROQ_MODEL
 
 # =============================================================================
 # Smart AI System Prompt: Expert Programming Tutor & Academic Assistant
