@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """
-Setup and packaging configuration for Gemini Terminal Chatbot.
-Enables running 'chatbot' directly from the command line after installation.
+Setup and packaging configuration for Terminal AI Chatbot.
 """
 
 from setuptools import setup
 
 setup(
     name="gemini-terminal-chatbot",
-    version="2.0.0",
-    description="Cross-platform terminal AI chatbot and CS tutor powered by Google Gemini",
+    version="2.2.0",
+    description="Minimalist terminal AI chatbot with conversation memory",
     author="Devoloper12",
-    py_modules=["chatbot", "config", "database", "ui"],
+    py_modules=["chatbot", "config", "database"],
     install_requires=[
         "groq>=0.11.0",
         "google-genai>=1.0.0",
         "python-dotenv>=1.0.0",
-        "rich>=13.0.0",
-        "colorama>=0.4.6",
     ],
     entry_points={
         "console_scripts": [
@@ -29,6 +26,5 @@ setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
-        "Environment :: Console",
     ],
 )
