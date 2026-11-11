@@ -15,11 +15,23 @@ APP_NAME = "Gemini Terminal AI Assistant"
 APP_VERSION = "2.0.0"
 APP_SUBTITLE = "Expert Programming Tutor & Computer Science Assistant"
 
-# File Paths & Directories
-BASE_DIR = Path(__file__).resolve().parent
-DB_FILE = BASE_DIR / "chatbot.db"
-SAVED_CODE_DIR = BASE_DIR / "saved_code"
-EXPORTS_DIR = BASE_DIR / "exports"
+# Storage directory resolution (supports running from local clone or global pip install)
+CWD = Path.cwd()
+if (CWD / "chatbot.py").exists() or (CWD / ".env").exists():
+    STORAGE_DIR = CWD
+else:
+    STORAGE_DIR = Path.home() / ".gemini_chatbot"
+
+try:
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+except (PermissionError, OSError):
+    STORAGE_DIR = Path.home() / ".gemini_chatbot"
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+
+BASE_DIR = STORAGE_DIR
+DB_FILE = STORAGE_DIR / "chatbot.db"
+SAVED_CODE_DIR = STORAGE_DIR / "saved_code"
+EXPORTS_DIR = STORAGE_DIR / "exports"
 
 # Ensure runtime directories exist
 SAVED_CODE_DIR.mkdir(parents=True, exist_ok=True)

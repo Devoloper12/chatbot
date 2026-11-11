@@ -149,7 +149,7 @@ class GeminiClient:
 # API Key Verification
 # ---------------------------------------------------------------------------
 def load_and_validate_api_key() -> str:
-    """Loads and validates the Gemini API key from the environment."""
+    """Loads and validates the Gemini API key from the environment or user input."""
     load_dotenv()
     load_dotenv(BASE_DIR / ".env")
     load_dotenv(Path.home() / ".gemini_chatbot" / ".env")
@@ -157,13 +157,27 @@ def load_and_validate_api_key() -> str:
     placeholder = "your_gemini_api_key_here"
 
     if not key or key.strip() == "" or key.strip() == placeholder:
+        console.print("\n[bold yellow]🔑 Google Gemini API Key Required[/bold yellow]")
+        console.print("[dim]You can generate a free key at: [bold cyan]https://aistudio.google.com/[/bold cyan][/dim]\n")
+        try:
+            prompt_key = console.input("[bold cyan]Enter your GEMINI_API_KEY (or press Enter to quit): [/bold cyan]").strip()
+            if prompt_key and prompt_key != placeholder:
+                key = prompt_key
+                # Save key to local or home configuration for future sessions
+                env_path = BASE_DIR / ".env"
+                with open(env_path, "a", encoding="utf-8") as f:
+                    f.write(f"\nGEMINI_API_KEY={key}\n")
+                console.print(f"[bold green][✔] API key saved to {env_path}![/bold green]\n")
+                return key
+        except (KeyboardInterrupt, EOFError):
+            pass
+
         print_error(
             "Missing or Invalid GEMINI_API_KEY",
-            "Please configure your Gemini API Key in the '.env' file.\n\n"
+            "Please configure your Gemini API Key in '.env' or set environment variable GEMINI_API_KEY.\n\n"
             "Steps to configure:\n"
             "1. Visit https://aistudio.google.com/ to generate a free API key.\n"
-            "2. Copy '.env.example' to '.env'.\n"
-            "3. Set GEMINI_API_KEY=AIzaSy...your_actual_key_here\n"
+            "2. Set: export GEMINI_API_KEY=AIzaSy...your_actual_key (or in PowerShell: $env:GEMINI_API_KEY='...')\n"
         )
         sys.exit(1)
 
