@@ -1,0 +1,13 @@
+# Dependencies for Gemini Terminal Chatbot
+
+# Official Google Gen AI SDK (Gemini API client)
+google-genai>=1.0.0
+
+# Load environment variables from .env file
+python-dotenv>=1.0.0
+
+# Rich terminal formatting, markdown rendering, spinners, and tables
+rich>=13.0.0
+
+# Cross-platform colored terminal text (Windows, Linux, macOS)
+colorama>=0.4.6
