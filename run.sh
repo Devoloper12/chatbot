@@ -9,8 +9,22 @@
 
 set -e
 
-# Resolve script directory (handles symlinks & execution from any directory)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve script directory or fallback for remote curl piping
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+
+if [ -z "$SCRIPT_DIR" ] || [ ! -f "$SCRIPT_DIR/chatbot.py" ]; then
+    APP_DIR="$HOME/.gemini_chatbot_app"
+    mkdir -p "$APP_DIR"
+    cd "$APP_DIR"
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+        .venv/bin/pip install --upgrade pip --quiet 2>/dev/null || true
+        .venv/bin/pip install git+https://github.com/Devoloper12/chatbot.git --quiet
+    fi
+    source .venv/bin/activate
+    exec chatbot "$@"
+fi
+
 cd "$SCRIPT_DIR"
 
 # Text Colors
