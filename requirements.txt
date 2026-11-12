@@ -1,13 +1,14 @@
 # Dependencies for Terminal AI Chatbot
+# Multi-Provider: Groq, OpenRouter, and Ollama
 
 # Groq High-Speed AI SDK (Primary Provider)
 groq>=0.11.0
 
-# Google Gen AI SDK (Alternative Provider)
-google-genai>=1.0.0
+# HTTP client for OpenRouter and Ollama APIs
+requests>=2.28.0
 
-# Load environment variables from .env file
+# Environment variables loader
 python-dotenv>=1.0.0
 
-# Packaging and console script entrypoints
+# Packaging and entry points
 setuptools>=61.0

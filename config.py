@@ -2,8 +2,8 @@
 =============================================================================
 Configuration & Smart AI System Prompts
 =============================================================================
-Defines configuration constants, app metadata, directory paths, and the
-system prompt configuring Gemini as an expert programming and CS tutor.
+Defines configuration constants, application metadata, storage paths,
+multi-provider settings (Groq, OpenRouter, Ollama), and the system prompt.
 =============================================================================
 """
 
@@ -11,11 +11,11 @@ import os
 from pathlib import Path
 
 # Application Metadata
-APP_NAME = "Terminal AI Assistant"
-APP_VERSION = "2.3.0"
-APP_SUBTITLE = "MCA & B.Tech Study Assistant (Powered by Groq)"
+APP_NAME = "Terminal AI Chatbot"
+APP_VERSION = "3.0.0"
+APP_SUBTITLE = "Multi-Provider AI Study Assistant (Groq -> OpenRouter -> Ollama)"
 
-# Storage directory resolution (supports running from local clone or global pip install)
+# Storage directory resolution
 CWD = Path.cwd()
 if (CWD / "chatbot.py").exists() or (CWD / ".env").exists():
     STORAGE_DIR = CWD
@@ -37,10 +37,26 @@ EXPORTS_DIR = STORAGE_DIR / "exports"
 SAVED_CODE_DIR.mkdir(parents=True, exist_ok=True)
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Default Model Configurations
+# =============================================================================
+# Multi-Provider Configuration
+# =============================================================================
+PROVIDER_GROQ = "groq"
+PROVIDER_OPENROUTER = "openrouter"
+PROVIDER_OLLAMA = "ollama"
+
+PROVIDERS_ORDER = [PROVIDER_GROQ, PROVIDER_OPENROUTER, PROVIDER_OLLAMA]
+
+PROVIDER_DISPLAY_NAMES = {
+    PROVIDER_GROQ: "Groq",
+    PROVIDER_OPENROUTER: "OpenRouter",
+    PROVIDER_OLLAMA: "Ollama",
+}
+
+# Model and URL Defaults
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
-DEFAULT_MODEL = DEFAULT_GROQ_MODEL
+DEFAULT_OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
+DEFAULT_OLLAMA_MODEL = "llama3"
 
 # =============================================================================
 # Smart AI System Prompt: MCA & B.Tech Study Assistant

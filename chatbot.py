@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Simple Terminal AI Chatbot
-A minimalist terminal chatbot with conversation memory powered by Groq and Gemini.
+A minimalist terminal chatbot with multi-provider automatic fallback
+(Groq -> OpenRouter -> Ollama) and conversation memory.
 """
 
 import os
@@ -9,130 +10,58 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Database and configuration
-from config import BASE_DIR, DEFAULT_GROQ_MODEL, SYSTEM_PROMPT
+from config import BASE_DIR, APP_NAME, APP_VERSION
 from database import ChatDatabase
-
-# Groq and Gemini clients
-try:
-    from groq import Groq
-    GROQ_AVAILABLE = True
-except ImportError:
-    GROQ_AVAILABLE = False
-
-try:
-    from google import genai
-    from google.genai import types as genai_types
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
+from providers import MultiProviderManager, reload_env_vars
 
 
-def load_api_key():
-    """Loads API key from .env files or environment."""
-    load_dotenv()
-    load_dotenv(BASE_DIR / ".env")
-    load_dotenv(Path.home() / ".terminal_ai_chatbot" / ".env")
-    load_dotenv(Path.home() / ".gemini_chatbot" / ".env")
-
-    groq_key = os.getenv("GROQ_API_KEY")
-    if groq_key and groq_key.strip() and groq_key != "your_groq_api_key_here":
-        return "groq", groq_key.strip(), os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL)
-
-    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if gemini_key and gemini_key.strip() and gemini_key != "your_gemini_api_key_here":
-        return "gemini", gemini_key.strip(), os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
-
-    # Prompt if missing
-    print("API Key Required.")
-    print("Get a free Groq key at: https://console.groq.com/keys")
-    user_key = input("Enter GROQ_API_KEY: ").strip()
-    if user_key:
-        env_file = BASE_DIR / ".env"
-        with open(env_file, "a", encoding="utf-8") as f:
-            f.write(f"\nGROQ_API_KEY={user_key}\n")
-        return "groq", user_key, DEFAULT_GROQ_MODEL
-
-    sys.exit(1)
+def print_help():
+    """Prints list of supported commands."""
+    print("""
+Commands:
+  /provider       - Display current active provider
+  /showproviders  - Show all providers, status, and priority
+  /groq           - Switch to Groq (Primary)
+  /openrouter     - Switch to OpenRouter (Secondary)
+  /ollama         - Switch to Ollama (Fallback)
+  /clear          - Clear current conversation history
+  /help           - Show this help message
+  /exit           - Exit the chatbot
+""")
 
 
-class SimpleAIClient:
-    def __init__(self, provider, api_key, model_name):
-        self.provider = provider
-        self.api_key = api_key
-        self.model_name = model_name
-        self.history = []
+def ensure_api_keys(provider_manager: MultiProviderManager):
+    """Prompts for an API key on first run if no provider is configured."""
+    groq_p = provider_manager.providers.get("groq")
+    or_p = provider_manager.providers.get("openrouter")
+    ollama_p = provider_manager.providers.get("ollama")
 
-        if self.provider == "groq":
-            self.client = Groq(api_key=self.api_key)
-        else:
-            self.client = genai.Client(api_key=self.api_key)
-            self.chat = None
-
-    def initialize_chat(self, past_messages=None):
-        self.history = past_messages or []
-        if self.provider == "gemini":
-            contents = []
-            for msg in self.history:
-                role = "user" if msg["role"] == "user" else "model"
-                contents.append(
-                    genai_types.Content(
-                        role=role,
-                        parts=[genai_types.Part.from_text(text=msg["content"])],
-                    )
-                )
-            config = genai_types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                temperature=0.7,
-            )
-            self.chat = self.client.chats.create(
-                model=self.model_name,
-                config=config,
-                history=contents if contents else None,
-            )
-
-    def get_response(self, user_message):
-        if self.provider == "groq":
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-            for m in self.history:
-                role = "assistant" if m["role"] == "bot" else "user"
-                messages.append({"role": role, "content": m["content"]})
-            messages.append({"role": "user", "content": user_message})
-
-            try:
-                completion = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    temperature=0.6,
-                    max_tokens=4096,
-                )
-                return completion.choices[0].message.content.strip()
-            except Exception as e:
-                if "rate_limit" in str(e).lower() and self.model_name != "openai/gpt-oss-20b":
-                    self.model_name = "openai/gpt-oss-20b"
-                    completion = self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=messages,
-                        temperature=0.6,
-                        max_tokens=4096,
-                    )
-                    return completion.choices[0].message.content.strip()
-                raise e
-        else:
-            if not self.chat:
-                self.initialize_chat(self.history)
-            res = self.chat.send_message(user_message)
-            return res.text.strip()
+    if not groq_p.is_configured() and not or_p.is_configured() and not ollama_p.is_configured():
+        print("No API Key or Provider Configured.")
+        print("Get a free Groq key at: https://console.groq.com/keys")
+        print("Or an OpenRouter key at: https://openrouter.ai/keys")
+        try:
+            user_key = input("Enter GROQ_API_KEY (or press Enter to skip): ").strip()
+            if user_key:
+                env_file = BASE_DIR / ".env"
+                with open(env_file, "a", encoding="utf-8") as f:
+                    f.write(f"\nGROQ_API_KEY={user_key}\n")
+                reload_env_vars()
+                groq_p.refresh_config()
+                provider_manager.current_provider_name = "groq"
+        except (KeyboardInterrupt, EOFError):
+            sys.exit(0)
 
 
 def main():
-    provider, api_key, model = load_api_key()
+    reload_env_vars()
+    provider_manager = MultiProviderManager()
+    ensure_api_keys(provider_manager)
+
     db = ChatDatabase()
     session_id, _ = db.get_or_create_active_session()
-
-    client = SimpleAIClient(provider, api_key, model)
-    past_messages = db.get_session_messages(session_id)
-    client.initialize_chat(past_messages)
+    raw_history = db.get_session_messages(session_id)
+    history = [{"role": m["role"], "content": m["content"]} for m in raw_history]
 
     while True:
         try:
@@ -141,24 +70,67 @@ def main():
             if not user_input:
                 continue
 
-            if user_input.lower() in ("exit", "quit", ":q"):
+            cmd = user_input.lower()
+
+            # Exit command
+            if cmd in ("/exit", "exit", "quit", ":q"):
                 break
 
-            if user_input.lower() == "clear":
+            # Help command
+            if cmd == "/help":
+                print_help()
+                continue
+
+            # Display active provider
+            if cmd == "/provider":
+                active = provider_manager.get_current_provider()
+                model_info = getattr(active, "model", "")
+                print(f"\nCurrent Provider: {active.display_name}" + (f" (Model: {model_info})\n" if model_info else "\n"))
+                continue
+
+            # Show all providers and status
+            if cmd == "/showproviders":
+                print(f"\n{provider_manager.show_providers()}\n")
+                continue
+
+            # Switch to Groq
+            if cmd == "/groq":
+                _, msg = provider_manager.set_provider("groq")
+                print(f"\n{msg}\n")
+                continue
+
+            # Switch to OpenRouter
+            if cmd == "/openrouter":
+                _, msg = provider_manager.set_provider("openrouter")
+                print(f"\n{msg}\n")
+                continue
+
+            # Switch to Ollama
+            if cmd == "/ollama":
+                _, msg = provider_manager.set_provider("ollama")
+                print(f"\n{msg}\n")
+                continue
+
+            # Clear session history
+            if cmd in ("/clear", "clear"):
                 db.clear_session_messages(session_id)
-                client.initialize_chat([])
+                history.clear()
                 print("\n[Chat history cleared]\n")
                 continue
 
-            response = client.get_response(user_input)
+            # Process AI query with multi-provider fallback
+            response, winning_provider = provider_manager.generate(user_input, history)
 
-            # Record into database memory
-            db.add_message(session_id, "user", user_input)
-            db.add_message(session_id, "bot", response)
-            client.history.append({"role": "user", "content": user_input})
-            client.history.append({"role": "bot", "content": response})
+            if response:
+                # Save to database memory and local history
+                db.add_message(session_id, "user", user_input)
+                db.add_message(session_id, "bot", response)
+                history.append({"role": "user", "content": user_input})
+                history.append({"role": "bot", "content": response})
 
-            print(f"\nBot: {response}\n")
+                print(f"\nBot:\n\n{response}\n\nCurrent Provider: {winning_provider}\n")
+            else:
+                print("\nError: All AI providers failed. Check your API keys and internet connection.\n")
 
         except (KeyboardInterrupt, EOFError):
             print()
