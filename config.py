@@ -54,7 +54,7 @@ PROVIDER_DISPLAY_NAMES = {
 
 # Model and URL Defaults
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
-DEFAULT_OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+DEFAULT_OPENROUTER_MODEL = "openrouter/free"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "llama3"
 

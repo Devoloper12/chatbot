@@ -208,13 +208,13 @@ class OpenRouterProvider(BaseProvider):
         if not self.api_key:
             raise RuntimeError("OPENROUTER_API_KEY not configured.")
 
-        # Candidate models including free tier backups
+        # Candidate models including active free tier fallbacks
         models_to_try = [self.model]
         free_fallbacks = [
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "google/gemini-2.0-flash-exp:free",
-            "meta-llama/llama-3.1-8b-instruct:free",
-            "mistralai/mistral-7b-instruct:free",
+            "openrouter/free",
+            "nvidia/nemotron-3.5-lightning:free",
+            "liquid/lfm-2.5-2.6b:free",
+            "liquid/lfm-3-1.7b:free",
         ]
         for fb in free_fallbacks:
             if fb not in models_to_try:
@@ -260,7 +260,9 @@ class OpenRouterProvider(BaseProvider):
                     raise RuntimeError("Invalid OPENROUTER_API_KEY.")
                 if res.status_code == 402:
                     raise RuntimeError("OpenRouter credits exhausted or insufficient.")
-                if res.status_code == 429 and current_model != models_to_try[-1]:
+
+                # If model is unavailable (404), rate-limited (429), or server error (5xx)
+                if current_model != models_to_try[-1]:
                     continue
 
                 raise RuntimeError(f"HTTP {res.status_code}: {msg}")
@@ -268,7 +270,9 @@ class OpenRouterProvider(BaseProvider):
             except Exception as e:
                 last_error = e
                 err_str = str(e).lower()
-                if "rate limit" in err_str and current_model != models_to_try[-1]:
+                if "invalid openrouter_api_key" in err_str or "credits exhausted" in err_str:
+                    raise e
+                if current_model != models_to_try[-1]:
                     continue
                 raise e
 
